@@ -5,7 +5,9 @@ import re, json
 window = tk.Tk()
 width, height = 800, 600
 window.geometry(f"{width}x{height}")
-window.title("Cubes Editor")
+window.title("Cubes Editor beta 1.1")
+icon = tk.PhotoImage(file="icon.png")
+window.iconphoto(True, icon)
 
 filenames = []
 widgets = []
@@ -14,6 +16,8 @@ current_tab = 0
 
 with open("config\\theme.json") as f:
     config = json.load(f)
+with open("config\\highlight.json") as f:
+    highlighting = json.load(f)
 
 s = ttk.Style()
 s.theme_use("default")
@@ -74,6 +78,22 @@ filenames.append("Untitled.txt")
 sidebars.append(sidebar)
 widgets.append(widget)
 
+def add_text_proxy(text):
+    orig = text._w + "_orig"
+    text.tk.call("rename", text._w, orig)
+
+    def proxy(cmd, *args):
+        result = text.tk.call(orig, cmd, *args)
+
+        if cmd in ("insert", "delete", "replace"):
+            highlight(text)
+
+        return result
+
+    text.tk.createcommand(text._w, proxy)
+
+add_text_proxy(widget)
+
 def new_tab(name="Untitled.txt"):
     global config, current_tab
 
@@ -109,8 +129,10 @@ def new_tab(name="Untitled.txt"):
                      bg=config["codeAreaColor"], fg=config["codeAreaTextColor"], insertbackground=config["cursorColor"],
                      width=2000)
     widget_new.pack(side="left", fill="both", expand=True)
-    with open(name) as fle:
-        widget_new.insert("1.0", fle.read())
+    add_text_proxy(widget_new)
+    if name != "Untitled.txt":
+        with open(name) as fle:
+            widget_new.insert("1.0", fle.read())
 
     def on_mousewheel_new(event):
         canvas_new.yview_scroll(int(-1 * (event.delta / 120)), "units")
@@ -119,6 +141,11 @@ def new_tab(name="Untitled.txt"):
 
     widget_new.tag_config("keyword", foreground=config["keywordColor"])
     widget_new.tag_config("function", foreground=config["functionColor"])
+    widget_new.tag_config("punct", foreground=config["puncColor"])
+    widget_new.tag_config("string", foreground=config["stringColor"])
+    widget_new.tag_config("num", foreground=config["numColor"])
+    widget_new.tag_config("ops", foreground=config["opsColor"])
+    widget_new.tag_config("bckslsh", foreground=config["bckslshColor"])
 
     filenames.append(name)
     widgets.append(widget_new)
@@ -209,7 +236,11 @@ def openconf():
     new_tab("config\\theme.json")
 def openreadme():
     new_tab("config\\readme.md")
+def openhl():
+    new_tab("config\\highlight.json")
+
 viewmenu.add_command(label="Config", command=openconf)
+viewmenu.add_command(label="Highlighting", command=openhl)
 viewmenu.add_command(label="README.md", command=openreadme)
 
 canvas.bind_all("<MouseWheel>", on_mousewheel)
@@ -227,51 +258,85 @@ widget.tag_config("keyword", foreground=config["keywordColor"])
 widget.tag_config("function", foreground=config["functionColor"])
 widget.tag_config("punct", foreground=config["puncColor"])
 widget.tag_config("string", foreground=config["stringColor"])
+widget.tag_config("num", foreground=config["numColor"])
+widget.tag_config("ops", foreground=config["opsColor"])
+widget.tag_config("bckslsh", foreground=config["bckslshColor"])
 
-KEYWORDS = r"\b(def|import|for|while|if|else|elif|return|class|from|as|with)\b"
-FUNCTIONS = r"\b(print|printf|cout|cin|input)\b"
-PUNCT = "[()\[\]{};,]"
-STRINGS = r"(['\"])(?:\\.|(?!\1).)*\1"
+KEYWORDS = highlighting["keywords"]
+FUNCTIONS = highlighting["functions"]
+PUNCT = highlighting["punct"]
+STRINGS = highlighting["string"]
+NUM = highlighting["num"]
+OPS = highlighting["ops"]
+BCKSLSH = highlighting["bckslsh"]
 re_keywords = re.compile(KEYWORDS)
 re_functions = re.compile(FUNCTIONS)
 re_punct = re.compile(PUNCT)
 re_strings = re.compile(STRINGS, re.DOTALL)
+re_num = re.compile(NUM)
+re_ops = re.compile(OPS)
+re_bckslsh = re.compile(BCKSLSH)
 
-def highlight():
-    widgets[current_tab].tag_remove("keyword", "1.0", "end")
-    widgets[current_tab].tag_remove("function", "1.0", "end")
-    widgets[current_tab].tag_remove("punct", "1.0", "end")
-    widgets[current_tab].tag_remove("strings", "1.0", "end")
+def highlight(wid = widgets[current_tab]):
+    wid.tag_remove("keyword", "1.0", "end")
+    wid.tag_remove("function", "1.0", "end")
+    wid.tag_remove("punct", "1.0", "end")
+    wid.tag_remove("strings", "1.0", "end")
 
-    text = widgets[current_tab].get("1.0", "end-1c")
+    text = wid.get("1.0", "end-1c")
 
     for m in re_keywords.finditer(text):
         start_off, end_off = m.start(), m.end()
         start_index = f"1.0+{start_off}c"
         end_index = f"1.0+{end_off}c"
-        widgets[current_tab].tag_add("keyword", start_index, end_index)
+        wid.tag_add("keyword", start_index, end_index)
 
     for m in re_functions.finditer(text):
         start_off, end_off = m.start(), m.end()
         start_index = f"1.0+{start_off}c"
         end_index = f"1.0+{end_off}c"
-        widgets[current_tab].tag_add("function", start_index, end_index)
+        wid.tag_add("function", start_index, end_index)
 
     for m in re_punct.finditer(text):
         start, end = m.start(), m.end()
-        widgets[current_tab].tag_add(
+        wid.tag_add(
             "punct",
+            f"1.0+{start}c",
+            f"1.0+{end}c"
+        )
+
+    for m in re_num.finditer(text):
+        start, end = m.start(), m.end()
+        wid.tag_add(
+            "num",
+            f"1.0+{start}c",
+            f"1.0+{end}c"
+        )
+
+    for m in re_ops.finditer(text):
+        start, end = m.start(), m.end()
+        wid.tag_add(
+            "ops",
             f"1.0+{start}c",
             f"1.0+{end}c"
         )
 
     for m in re_strings.finditer(text):
         start, end = m.start(), m.end()
-        widgets[current_tab].tag_add(
+        wid.tag_add(
             "string",
             f"1.0+{start}c",
             f"1.0+{end}c"
         )
+
+    for m in re_bckslsh.finditer(text):
+        start, end = m.start(), m.end()
+        wid.tag_add(
+            "bckslsh",
+            f"1.0+{start}c",
+            f"1.0+{end}c"
+        )
+
 
 def update():
     global current_tab
@@ -285,7 +350,7 @@ def update():
         text_add += "   \n"
     sidebars[current_tab].configure(text=text_add)
 
-    highlight()
+    highlight(widgets[current_tab])
 
     window.after(100, update)
 
