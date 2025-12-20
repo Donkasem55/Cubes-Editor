@@ -1,11 +1,14 @@
 import tkinter as tk
 from tkinter import filedialog, ttk
 import re, json
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
 
 window = tk.Tk()
 width, height = 800, 600
 window.geometry(f"{width}x{height}")
-window.title("Cubes Editor beta 1.1")
+window.title("Cubes Editor beta 1.2")
 icon = tk.PhotoImage(file="icon.png")
 window.iconphoto(True, icon)
 
@@ -14,10 +17,13 @@ widgets = []
 sidebars = []
 current_tab = 0
 
-with open("config\\theme.json") as f:
+with open(BASE_DIR / "config" / "theme.json") as f:
     config = json.load(f)
-with open("config\\highlight.json") as f:
+
+with open(BASE_DIR / "config" / "highlight.json") as f:
     highlighting = json.load(f)
+    
+window.attributes("-alpha", config["alpha"])
 
 s = ttk.Style()
 s.theme_use("default")
@@ -153,7 +159,12 @@ def new_tab(name="Untitled.txt"):
 
 
 def on_mousewheel(event):
-    canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    if event.delta:
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    elif event.num == 4:
+        canvas.yview_scroll(-1, "units")
+    elif event.num == 5:
+        canvas.yview_scroll(1, "units")
 
 def openfile():
     newfile = filedialog.askopenfilename(
@@ -183,6 +194,7 @@ def openfile():
     if newfile == "":
         return
     new_tab(newfile)
+    
 
 def save():
     global current_tab
@@ -233,11 +245,13 @@ filemenu.add_command(label="Save", accelerator="Ctrl+S", command=save)
 filemenu.add_command(label="Save As", accelerator="Ctrl+Shift+S", command=saveas)
 
 def openconf():
-    new_tab("config\\theme.json")
+    new_tab(str(BASE_DIR / "config" / "theme.json"))
+
 def openreadme():
-    new_tab("config\\readme.md")
+    new_tab(str(BASE_DIR / "config" / "readme.md"))
+
 def openhl():
-    new_tab("config\\highlight.json")
+    new_tab(str(BASE_DIR / "config" / "highlight.json"))
 
 viewmenu.add_command(label="Config", command=openconf)
 viewmenu.add_command(label="Highlighting", command=openhl)
@@ -354,6 +368,11 @@ def update():
 
     window.after(100, update)
 
-update()
+def main():
+    update()
 
-window.mainloop()
+    window.mainloop()
+    
+if __name__ == "__main__":
+    main()
+
