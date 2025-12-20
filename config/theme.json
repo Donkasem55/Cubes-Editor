@@ -25,5 +25,6 @@
     "activeTopColor": "#4d4d4d",
     "activeTopTextColor": "#FFFFFF",
     "UIwidth": 5,
-    "UIheight": 30
+    "UIheight": 30,
+    "alpha": 0.9
 }
